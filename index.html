@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080808">
+  <title>Rubchinsky Stars</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#080808;--panel:#141414;--line:#292929;--muted:#9a9a9a;--white:#f5f5f5}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--white);font-family:Arial,Helvetica,sans-serif;padding:20px 16px calc(28px + env(safe-area-inset-bottom))}
+    .wrap{max-width:520px;margin:0 auto}
+    header{padding:14px 2px 22px;border-bottom:1px solid var(--line)}
+    .brand{font-size:12px;letter-spacing:3px;color:#aaa;text-transform:uppercase}
+    h1{font-size:30px;line-height:1.05;margin:10px 0 7px;font-weight:800;letter-spacing:-1px}
+    .sub{font-size:13px;color:var(--muted)}
+    .section-title{font-size:13px;color:#aaa;text-transform:uppercase;letter-spacing:1.5px;margin:24px 2px 12px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .package{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px 13px;text-align:left;color:var(--white);min-height:92px;cursor:pointer}
+    .package:active,.package.selected{border-color:#f5f5f5;background:#202020}
+    .stars{font-size:20px;font-weight:800}
+    .price{margin-top:7px;color:#aaa;font-size:13px}
+    .custom{margin-top:17px;padding:17px;background:var(--panel);border:1px solid var(--line);border-radius:16px}
+    label{display:block;font-size:13px;color:#aaa;margin-bottom:9px}
+    input{width:100%;background:#080808;border:1px solid #333;border-radius:11px;padding:14px;color:white;font-size:17px;outline:none}
+    input:focus{border-color:#ddd}
+    .rate{font-size:12px;color:#888;margin-top:9px}
+    .summary{margin-top:17px;background:#f2f2f2;color:#080808;border-radius:16px;padding:17px}
+    .sumrow{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#555}
+    .total{font-size:28px;font-weight:800;color:#080808;margin-top:6px}
+    .buy{width:100%;margin-top:15px;border:0;border-radius:12px;padding:16px;background:#fff;color:#050505;font-weight:800;font-size:15px;cursor:pointer}
+    .buy:disabled{opacity:.35}
+    .notice{font-size:11px;color:#777;text-align:center;line-height:1.5;margin:15px 8px 0}
+    .toast{display:none;margin-top:14px;padding:13px;border:1px solid #444;border-radius:12px;font-size:13px;line-height:1.45}
+    footer{text-align:center;color:#555;font-size:11px;margin-top:25px;letter-spacing:1px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">rubchinsky store</div>
+    <h1>telegram<br>stars<span style="color:#aaa">.</span></h1>
+    <div class="sub">выбери количество звёзд для заказа</div>
+  </header>
+
+  <div class="section-title">популярные пакеты</div>
+  <div class="grid" id="packages">
+    <button class="package" data-stars="55"><div class="stars">55 ⭐</div><div class="price">50 грн</div></button>
+    <button class="package" data-stars="110"><div class="stars">110 ⭐</div><div class="price">100 грн</div></button>
+    <button class="package" data-stars="225"><div class="stars">225 ⭐</div><div class="price">200 грн</div></button>
+    <button class="package" data-stars="340"><div class="stars">340 ⭐</div><div class="price">300 грн</div></button>
+    <button class="package" data-stars="545"><div class="stars">545 ⭐</div><div class="price">500 грн</div></button>
+    <button class="package" data-stars="1100"><div class="stars">1 100 ⭐</div><div class="price">980 грн</div></button>
+    <button class="package" data-stars="2250"><div class="stars">2 250 ⭐</div><div class="price">1 990 грн</div></button>
+    <button class="package" data-stars="5500"><div class="stars">5 500 ⭐</div><div class="price">4 800 грн</div></button>
+  </div>
+
+  <div class="custom">
+    <label for="quantity">своё количество звёзд</label>
+    <input id="quantity" type="number" min="1" max="1000000" inputmode="numeric" placeholder="например, 150">
+    <div class="rate">расчёт по курсу 1 ⭐ = 0,94 грн</div>
+  </div>
+
+  <div class="summary">
+    <div class="sumrow"><span>количество</span><strong id="chosen">не выбрано</strong></div>
+    <div class="total" id="total">0,00 грн</div>
+    <button class="buy" id="buy" disabled>перейти к заказу →</button>
+  </div>
+  <div class="toast" id="toast"></div>
+  <div class="notice">после оформления бот пришлёт инструкции по оплате. заказ подтверждается администратором после проверки квитанции.</div>
+  <footer>RUBCHINSKY STARS · 2026</footer>
+</div>
+<script>
+(() => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+  const input = document.getElementById('quantity');
+  const chosen = document.getElementById('chosen');
+  const total = document.getElementById('total');
+  const buy = document.getElementById('buy');
+  const toast = document.getElementById('toast');
+  let stars = 0;
+  const money = n => (n * 0.94).toFixed(2).replace('.', ',');
+  function setStars(n, selectedButton) {
+    stars = Number.isInteger(n) && n > 0 && n <= 1000000 ? n : 0;
+    chosen.textContent = stars ? stars.toLocaleString('ru-RU') + ' ⭐' : 'не выбрано';
+    total.textContent = stars ? money(stars * 1) + ' грн' : '0,00 грн';
+    buy.disabled = !stars;
+    document.querySelectorAll('.package').forEach(b => b.classList.toggle('selected', b === selectedButton));
+    if (selectedButton) input.value = '';
+  }
+  document.querySelectorAll('.package').forEach(button => {
+    button.addEventListener('click', () => setStars(Number(button.dataset.stars), button));
+  });
+  input.addEventListener('input', () => {
+    const n = Number(input.value);
+    setStars(Number.isSafeInteger(n) ? n : 0, null);
+  });
+  buy.addEventListener('click', () => {
+    if (!stars) return;
+    const data = JSON.stringify({stars});
+    if (tg && tg.initData) {
+      tg.sendData(data);
+      toast.style.display = 'block';
+      toast.textContent = 'заказ отправлен боту. вернись в чат и следуй инструкциям по оплате.';
+      buy.disabled = true;
+    } else {
+      toast.style.display = 'block';
+      toast.textContent = 'это предварительный просмотр. открой приложение через кнопку в telegram-боте, чтобы отправить заказ.';
+    }
+  });
+})();
+</script>
+</body>
+</html>
